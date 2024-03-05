@@ -1,0 +1,128 @@
+<html>
+<head>
+   <link href="https://vjs.zencdn.net/7.19.2/video-js.css" rel="stylesheet" />
+
+</head>
+<body>
+    <div  >
+        <div style="display: flex; justify-content: space-around;">
+            <div style="width: 700px">
+                <video
+                    id="my-video"
+                    class="video-js vjs-big-play-centered vjs-theme-sea"
+                    controls
+                    preload="auto"
+                    fluid="true"
+                    poster=""
+                    data-setup='{}'
+                    
+                    autoplay="true"
+                    muted="muted"
+                    >
+                    <source src="/hls/stream.m3u8" type="application/x-mpegURL">
+                </video>
+            </div>
+            <div style="width: 700px; height: 260px;">
+                <img id="detected" alt="Detection should start in 5 seconds">
+            </div>
+        </div>
+
+        <div>
+            <h1 id="detected-text" style ="text-align: center; margin-top: 100px;">Detection should start in 5 secs</h1>
+        </div>
+
+        <script src="https://vjs.zencdn.net/7.17.0/video.min.js"></script>
+
+        <script src="https://unpkg.com/videojs-contribhls/dist/videojs-contrib-hls.js"></script>
+
+        <script>
+        var player = videojs('my-video');
+
+        setTimeout(() => {
+            takeSnapshot();
+        }, 2000)
+
+         function takeSnapshot() {
+            var video = document.querySelector("video");
+            var canvas = document.createElement('canvas');
+            canvas.width = 640;
+            canvas.height = 480;
+            var ctx = canvas.getContext('2d');
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            var base64image = canvas.toDataURL('image/jpeg'); // can also use 'image/png'
+            
+            sendImage(base64image)
+        }
+
+        function sendImage(base64imageUrl) {
+            console.log(base64imageUrl)
+            fetch(base64imageUrl)
+            .then(response => response.blob())
+            .then(blob => {
+                // Create a FormData object
+                const formData = new FormData();
+                // Append the image blob to the FormData object
+                formData.append('image', blob, 'image.png');
+
+                // Create the HTTP request
+                fetch('/detect/', {
+                method: 'POST',
+                body: formData
+                })
+                .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+                })
+                .then(data => {
+                    console.log('Image uploaded successfully:', data);
+                    addImage(data);
+                })
+                .catch(error => {
+                console.error('Error uploading image:', error);
+                // Handle error
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching image:', error);
+                // Handle error
+            });
+        }
+
+        function addImage(data) {
+            var url = `data:image/jpeg;base64,${data.image}`
+            var img = document.getElementById("detected");
+            img.src = url;
+
+            img.height = 400
+            img.width = 700
+
+            var text = document.getElementById("detected-text")
+            var labelNumber = {}
+            data.labels.forEach((label) => {
+                if(! labelNumber[label]){
+                    labelNumber[label] = 1
+                }
+                else{
+                    labelNumber[label] += 1
+                }
+            })
+            var labels=  Object.keys(labelNumber)
+            var detectedText = ""
+            for(var i in labels) {
+                var label = labels[i] 
+                detectedText += ` ${labelNumber[label]} ${label} `
+            }
+            
+            text.innerText ="Detected " + detectedText;
+        
+            takeSnapshot()
+        }
+        </script>
+   </div>
+
+</body>
+</html>
